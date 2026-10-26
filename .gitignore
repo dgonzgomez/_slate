@@ -1,0 +1,41 @@
+# Private workspace and separate projects
+/.tools/
+/build/
+/dremio_app/
+/dremio_legacy/
+/[Mm][Aa][Ss][Tt][Ee][Rr]*
+**/*[Hh][Aa][Nn][Dd][Oo][Vv][Ee][Rr]*
+# Only the approved root README is included.
+**/[Rr][Ee][Aa][Dd][Mm][Ee]*
+!/README.md
+
+# Local tests stay out of the repository.
+**/tests/
+**/test/
+/scripts/test.sh
+
+# Credentials, signing files, local configuration
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+.env
+.env.*
+local.properties
+*.args
+
+# Build/editor/OS files
+*.class
+*.apk
+*.dex
+*.jar
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+__pycache__/
+*.pyc
+
+**/*[Hh][Aa][Nn][Dd][Oo][Ff][Ff]*
