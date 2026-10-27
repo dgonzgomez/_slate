@@ -36,8 +36,8 @@ class SettingsPanel extends FrameLayout {
   glyph=new Glyph();left.addView(glyph,new LinearLayout.LayoutParams(dp(112),dp(112)));
   title=new TextView(home);title.setTextSize(28);title.setTextColor(0xfff5f5f7);title.setTypeface(Typeface.create("sans-serif-medium",0));title.setGravity(Gravity.CENTER);
   LinearLayout.LayoutParams tlp=new LinearLayout.LayoutParams(-2,-2);tlp.topMargin=dp(22);left.addView(title,tlp);
-  scroll=new ScrollView(home);scroll.setVerticalScrollBarEnabled(false);scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);scroll.setClipToPadding(false);scroll.setPadding(0,dp(96),0,dp(60));
-  list=new LinearLayout(home);list.setOrientation(LinearLayout.VERTICAL);list.setClipChildren(false);list.setClipToPadding(false);list.setPadding(dp(14),dp(4),dp(14),0);scroll.addView(list);
+  scroll=new ScrollView(home);scroll.setVerticalScrollBarEnabled(false);scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);scroll.setClipToPadding(false);scroll.setClipChildren(false);scroll.setPadding(0,dp(96),0,dp(60));
+  list=new LinearLayout(home);list.setOrientation(LinearLayout.VERTICAL);list.setClipChildren(false);list.setClipToPadding(false);list.setPadding(dp(32),dp(4),dp(32),0);scroll.addView(list);
   columns.addView(scroll,new LinearLayout.LayoutParams(0,-1,0.58f));
   refreshBackdrop();
   main();
@@ -101,7 +101,17 @@ class SettingsPanel extends FrameLayout {
  private int legacyWallpaper(){int old=home.prefs.getInt("wallpaper",0);return !home.prefs.contains("wallpaper_theme")&&old>=3&&old<LEGACY.length?old:-1;}
  private void refreshWallpaper(){home.refreshWallpaper();post(()->{refreshBackdrop();wallpapers();});}
  private void selectWallpaper(String id){home.prefs.edit().remove("wallpaper_theme").putString(WallpaperLibrary.SELECTED,id).apply();refreshWallpaper();}
- private void showDelete(View option,String id){int index=list.indexOfChild(option);wallpaperActions.show(home,option,list,()->deleteWallpaper(id,index));}
+ private void showDelete(View option,String id){
+  int index=list.indexOfChild(option);List<WallpaperLibrary.Saved> saved=WallpaperLibrary.list(home);int position=-1;
+  for(int i=0;i<saved.size();i++)if(saved.get(i).id.equals(id)){position=i;break;}
+  wallpaperActions.show(home,option,list,()->deleteWallpaper(id,index),position>0?()->moveWallpaper(id,-1):null,position>=0&&position<saved.size()-1?()->moveWallpaper(id,1):null);
+ }
+ private void moveWallpaper(String id,int direction){
+  if(!WallpaperLibrary.move(home,id,direction)){Toast.makeText(home,"Couldn’t move this wallpaper",Toast.LENGTH_SHORT).show();return;}
+  wallpapers();
+  List<WallpaperLibrary.Saved> saved=WallpaperLibrary.list(home);
+  for(int i=0;i<saved.size();i++)if(saved.get(i).id.equals(id)){final View moved=list.getChildAt(i+1);moved.requestFocus();scroll.post(()->scroll.smoothScrollTo(0,Math.max(0,moved.getTop()-dp(70))));break;}
+ }
  private void deleteWallpaper(String id,int index){
   if(!WallpaperLibrary.remove(home,id)){Toast.makeText(home,"Couldn’t delete this wallpaper",Toast.LENGTH_SHORT).show();if(index>=0&&index<list.getChildCount())list.getChildAt(index).requestFocus();return;}
   home.refreshWallpaper();refreshBackdrop();wallpapers();

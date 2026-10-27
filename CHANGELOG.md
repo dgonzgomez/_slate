@@ -1,5 +1,10 @@
 # What's new
 
+### 0.1.3
+
+- Wallpapers: add up and down arrows around the trash button to reorder saved wallpapers. The order is saved and focus follows the moved wallpaper.
+- Wallpaper controls: give lifted rows more room and remove the bounce to prevent clipping at the sides.
+
 ### 0.1.2
 
 - Updates: keep remote focus on the update button as checking and downloading finish.

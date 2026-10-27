@@ -29,6 +29,19 @@ final class WallpaperLibrary {
    file(context,id).delete();return true;
   }catch(Exception error){return false;}
  }
+ static boolean move(Context context,String id,int direction){
+  if(direction!=-1&&direction!=1)return false;
+  List<Saved> saved=list(context);int index=-1;
+  for(int i=0;i<saved.size();i++)if(saved.get(i).id.equals(id)){index=i;break;}
+  int target=index+direction;
+  if(index<0||target<0||target>=saved.size())return false;
+  Collections.swap(saved,index,target);
+  try{
+   JSONArray entries=new JSONArray();
+   for(Saved item:saved){JSONObject entry=new JSONObject();entry.put("id",item.id);entry.put("name",item.name);entries.put(entry);}
+   return prefs(context).edit().putString("wallpaper_library",entries.toString()).commit();
+  }catch(Exception error){return false;}
+ }
  static Saved add(Context context,Wallhaven.Image image,String query,Bitmap framed)throws Exception{
   File target=file(context,image.id),pending=new File(target.getParentFile(),image.id+".part");
   try{
