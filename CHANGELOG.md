@@ -1,5 +1,9 @@
 # What's new
 
+### 0.1.4
+
+- Updates: fix the false installation-permission warning on Fire TV and let the system installer check permission after returning from settings.
+
 ### 0.1.3
 
 - Wallpapers: add up and down arrows around the trash button to reorder saved wallpapers. The order is saved and focus follows the moved wallpaper.

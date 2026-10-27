@@ -96,10 +96,11 @@ final class UpdateManager {
   });
  }
  /** Runs on the UI thread; Fire OS owns the final installation confirmation. */
- String install()throws Exception{
+ String install()throws Exception{return install(true);}
+ private String install(boolean checkPermission)throws Exception{
   if(!downloaded||available==null)throw new IOException("Download the update first.");
   File apk=UpdateProvider.apk(activity);validate(apk,available.version);
-  if(Build.VERSION.SDK_INT>=26&&!activity.getPackageManager().canRequestPackageInstalls()){
+  if(checkPermission&&UpdatePolicy.supportsInstallPermissionCheck(Build.VERSION.SDK_INT,activity.getApplicationInfo().targetSdkVersion)&&!activity.getPackageManager().canRequestPackageInstalls()){
    HomeService.bypassUntil=SystemClock.elapsedRealtime()+120000;
    awaitingInstallPermission=true;
    try{
@@ -131,10 +132,8 @@ final class UpdateManager {
  void permissionReturned(){
   if(closed||!awaitingInstallPermission)return;
   awaitingInstallPermission=false;
-  if(Build.VERSION.SDK_INT>=26&&!activity.getPackageManager().canRequestPackageInstalls()){
-   say(observer,"Installation permission is still off. Select Install update to open settings again.",false);return;
-  }
-  try{say(observer,install(),false);}
+  // The system installer owns the permission decision after returning from settings.
+  try{say(observer,install(false),false);}
   catch(Exception e){say(observer,message(e,"The installer couldn’t open. Select Install update to try again."),false);}
  }
  private static Set<Signature> signatures(PackageInfo info){return info.signatures==null?Collections.emptySet():new HashSet<>(Arrays.asList(info.signatures));}

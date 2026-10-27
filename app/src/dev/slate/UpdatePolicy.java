@@ -8,6 +8,8 @@ public final class UpdatePolicy {
  public static final String ASSET="Slate-firetv.apk";
  public static final long MAX_APK=128L*1024*1024;
  private UpdatePolicy(){}
+ /** canRequestPackageInstalls requires both device and target API 26+. */
+ public static boolean supportsInstallPermissionCheck(int deviceSdk,int targetSdk){return deviceSdk>=26&&targetSdk>=26;}
  public static boolean newer(String candidate,String installed){
   if(candidate==null||!candidate.matches("v?[0-9]+\\.[0-9]+\\.[0-9]+"))return false;
   String[] a=candidate.replaceFirst("^v","").split("\\."),b=installed.replaceFirst("^v","").split("\\.");
