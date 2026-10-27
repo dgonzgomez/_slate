@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
   public void onInputRemoved(String inputId){refreshInputs();}
  };
  private final String[] defaults={"com.netflix.ninja","com.disney.disneyplus","com.hbo.hbonow","com.hulu.plus","com.crunchyroll.crunchyroid","com.amazon.avod","dev.dremio.flutter","com.stremio.one"};
- private int dp(float x){return Math.round(x*getResources().getDisplayMetrics().density);}
+ int dp(float x){return Math.round(x*getResources().getDisplayMetrics().density);}
  @Override public void onCreate(Bundle b){
   super.onCreate(b);getWindow().setWindowAnimations(0);LauncherWatchService.start(this,new Intent(this,LauncherWatchService.class));
   prefs=getSharedPreferences("slate_home",0);
@@ -83,7 +83,9 @@ public class MainActivity extends Activity {
   TextClock clock=new TextClock(this);clock.setFormat12Hour("h:mm");clock.setFormat24Hour("HH:mm");clock.setTextSize(19);clock.setTextColor(0xf2f5f5f7);clock.setTypeface(Typeface.create("sans-serif-medium",0));clock.setShadowLayer(dp(6),0,dp(1),0x66000000);header.addView(clock);
   GearButton settings=new GearButton();settings.setOnClickListener(v->settings());settingsControl=settings;settings.setOnKeyListener((v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_DOWN){if(event.getAction()==KeyEvent.ACTION_DOWN&&event.getRepeatCount()==0){if(sourcesActive&&inputRail.getChildCount()>0)inputRail.getChildAt(Math.min(sourceIndex,inputRail.getChildCount()-1)).requestFocus();else if(!favorites.isEmpty())rail.getChildAt(Math.max(0,favorites.indexOf(focusedPackage))).requestFocus();}return true;}return false;});LinearLayout.LayoutParams slp=new LinearLayout.LayoutParams(dp(40),dp(40));slp.setMargins(dp(20),0,0,0);header.addView(settings,slp);
   FrameLayout stage=new FrameLayout(this);stage.setClipChildren(false);stage.setClipToPadding(false);root.addView(stage,new LinearLayout.LayoutParams(-1,0,1f));
-  appLayer=new LinearLayout(this);appLayer.setOrientation(1);appLayer.setClipChildren(false);appLayer.setClipToPadding(false);FrameLayout.LayoutParams appsLp=new FrameLayout.LayoutParams(-1,dp(160),Gravity.BOTTOM);appsLp.bottomMargin=dp(26);appsLp.leftMargin=-dp(40);appsLp.rightMargin=-dp(40);stage.addView(appLayer,appsLp);
+  // Reserve carousel space only for physical HDMI inputs, including idle ports.
+  int appBottom=dp(hdmiInputs.isEmpty()?-24:26);
+  appLayer=new LinearLayout(this);appLayer.setOrientation(1);appLayer.setClipChildren(false);appLayer.setClipToPadding(false);FrameLayout.LayoutParams appsLp=new FrameLayout.LayoutParams(-1,dp(160),Gravity.BOTTOM);appsLp.bottomMargin=appBottom;appsLp.leftMargin=-dp(40);appsLp.rightMargin=-dp(40);stage.addView(appLayer,appsLp);
   HorizontalScrollView scroll=new HorizontalScrollView(this);scroll.setPadding(dp(40),dp(26),0,dp(18));scroll.setClipChildren(false);scroll.setClipToPadding(false);scroll.setHorizontalScrollBarEnabled(false);scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
   rail=new LinearLayout(this);rail.setPadding(0,0,0,0);rail.setClipChildren(false);rail.setClipToPadding(false);scroll.addView(rail);appLayer.addView(scroll,new LinearLayout.LayoutParams(-1,dp(160)));
 
@@ -99,7 +101,7 @@ public class MainActivity extends Activity {
    input.setOnKeyListener((v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_UP){if(event.getAction()==KeyEvent.ACTION_DOWN&&event.getRepeatCount()==0)settingsControl.requestFocus();return true;}if(key==KeyEvent.KEYCODE_DPAD_DOWN){if(event.getAction()==KeyEvent.ACTION_DOWN&&event.getRepeatCount()==0){setDepth(false,true);if(!favorites.isEmpty())rail.getChildAt(Math.max(0,favorites.indexOf(focusedPackage))).requestFocus();else settings.requestFocus();}return true;}return false;});
   }
   refreshInputs();
-  appPreview=new BlurPreview();FrameLayout.LayoutParams ap=new FrameLayout.LayoutParams(-1,dp(160),Gravity.BOTTOM);ap.bottomMargin=dp(26);ap.leftMargin=-dp(40);ap.rightMargin=-dp(40);stage.addView(appPreview,ap);
+  appPreview=new BlurPreview();FrameLayout.LayoutParams ap=new FrameLayout.LayoutParams(-1,dp(160),Gravity.BOTTOM);ap.bottomMargin=appBottom;ap.leftMargin=-dp(40);ap.rightMargin=-dp(40);stage.addView(appPreview,ap);
   sourcePreview=new BlurPreview();FrameLayout.LayoutParams sp=new FrameLayout.LayoutParams(-1,dp(88),Gravity.BOTTOM);sp.bottomMargin=-dp(62);stage.addView(sourcePreview,sp);
   depthInitialized=false;setDepth(false,false);stage.post(()->{depthInitialized=false;setDepth(false,false);if(!returnAnimationPending)playIntro();warmFocusedLaunch();maybeReturn();});
   if(favorites.isEmpty())settings.requestFocus();
@@ -219,6 +221,7 @@ public class MainActivity extends Activity {
  }
  private void setDepth(boolean sources,boolean animate){
   if(appLayer==null||sourceLayer==null||appPreview==null||sourcePreview==null)return;
+  if(inputRail.getChildCount()==0){sourcesActive=false;depthInitialized=true;sourceLayer.setVisibility(View.GONE);sourcePreview.setVisibility(View.GONE);appPreview.setAlpha(0);return;}
   if(sources&&inputRail.getChildCount()==0)return;
   if(depthInitialized&&sourcesActive==sources)return;
   depthInitialized=true;
@@ -246,7 +249,7 @@ public class MainActivity extends Activity {
   protected void onDetachedFromWindow(){if(image!=null){image.recycle();image=null;}super.onDetachedFromWindow();}
  }
  private TextView text(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);t.setGravity(Gravity.CENTER_VERTICAL);t.setFontFeatureSettings("kern");t.setSingleLine(true);t.setEllipsize(android.text.TextUtils.TruncateAt.END);return t;}
- private GradientDrawable surface(int color,float radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
+ GradientDrawable surface(int color,float radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
  static void drawGear(Canvas c,float cx,float cy,float r,Paint paint){
   Path gear=new Path();int teeth=8;
   for(int i=0;i<teeth*2;i++){
@@ -341,7 +344,7 @@ public class MainActivity extends Activity {
   boolean selected;Paint pen=new Paint(3);HdmiIcon(){super(MainActivity.this);}
   protected void onDraw(Canvas c){float u=getWidth()/28f;c.save();c.scale(u,u);pen.setColor(selected?0xff1c1c1e:0xe6f2f2f7);pen.setStyle(Paint.Style.STROKE);pen.setStrokeWidth(1.5f);pen.setStrokeJoin(Paint.Join.ROUND);pen.setStrokeCap(Paint.Cap.ROUND);c.drawRoundRect(2,3,26,19,3,3,pen);c.drawLine(10,24,18,24,pen);c.drawLine(14,19,14,24,pen);Path port=new Path();port.moveTo(8,9);port.lineTo(20,9);port.lineTo(18,14);port.lineTo(10,14);port.close();c.drawPath(port,pen);c.restore();}
  }
- private class IconControl extends View{
+ class IconControl extends View{
   private final int kind;private final Paint paint=new Paint(3);
   IconControl(int kind,String label){super(MainActivity.this);this.kind=kind;setFocusable(true);setClickable(true);setContentDescription(label);setOnFocusChangeListener((v,f)->invalidate());}
   protected void onDraw(Canvas c){float d=getWidth();paint.setStyle(Paint.Style.FILL);paint.setColor(isFocused()?0xfff0f1f3:0xff33353b);c.drawCircle(d/2,d/2,d*.48f,paint);paint.setColor(isFocused()?0xff15161a:0xfff0f1f3);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(1.6f));paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);
@@ -351,7 +354,7 @@ public class MainActivity extends Activity {
  }
  void invalidateMotionCache(){preparedLaunch=null;warmFocusedLaunch();}
  View wallpaperView(){return wallpaper;}
- void refreshWallpaper(){wallpaperPhoto=null;wallpaperPhotoTheme=-1;wallpaperPhotoCustom="";wallpaper.invalidate();}
+ void refreshWallpaper(){cancelPreparation();preparedLaunch=null;wallpaperPhoto=null;wallpaperPhotoTheme=-1;wallpaperPhotoCustom="";wallpaper.invalidate();}
  private void settings(){
   if(panel!=null)return;
   cancelPreparation();preparedLaunch=null;panel=new SettingsPanel(this);((FrameLayout)wallpaper.getParent()).addView(panel,new FrameLayout.LayoutParams(-1,-1));panel.show();
@@ -413,6 +416,7 @@ public class MainActivity extends Activity {
   /** Photo wallpapers, from theme 3 on; only the selected one is kept in memory. */
   final String[] photos={"batman.webp","batman_moon.jpg","batman_blast.webp","batman_snow.jpg","batman_dark_knight.jpg"};
   Paint paint=new Paint(3);
+  final Paint scrimPaint=new Paint(Paint.ANTI_ALIAS_FLAG);
   Wallpaper(){super(MainActivity.this);}
   Bitmap photoFor(int theme){
    String custom=prefs.getString(WallpaperLibrary.SELECTED,"");
@@ -435,8 +439,10 @@ public class MainActivity extends Activity {
    paint.setColor(Color.WHITE);
    Bitmap photo=photoFor(theme);
    if(photo!=null){float scale=Math.max(w/(float)photo.getWidth(),h/(float)photo.getHeight());float bw=photo.getWidth()*scale,bh=photo.getHeight()*scale;c.drawBitmap(photo,null,new RectF((w-bw)/2,(h-bh)/2,(w+bw)/2,(h+bh)/2),paint);}
-   paint.setShader(new LinearGradient(0,0,0,h*.28f,new int[]{day?0x4410141e:0x9910141e,0x0010141e},null,Shader.TileMode.CLAMP));c.drawRect(0,0,w,h*.28f,paint);paint.setShader(null);
-   paint.setShader(new LinearGradient(0,h*.22f,0,h,day?new int[]{0x0010141e,0x1810141e,0x66080a10}:new int[]{0x0010141e,0xa610141e,0xf5080a10},new float[]{0,0.5f,1},Shader.TileMode.CLAMP));c.drawRect(0,h*.22f,w,h,paint);paint.setShader(null);
+   // Photo readability is independent of whichever preset was selected before it.
+   boolean lightScrim=photo==null&&day;
+   scrimPaint.setShader(new LinearGradient(0,0,0,h*.28f,new int[]{lightScrim?0x55000000:0xaa000000,0x00000000},null,Shader.TileMode.CLAMP));c.drawRect(0,0,w,h*.28f,scrimPaint);
+   scrimPaint.setShader(new LinearGradient(0,h*.22f,0,h,lightScrim?new int[]{0x00000000,0x30000000,0x80000000}:new int[]{0x00000000,0xc0000000,0xfa000000},new float[]{0,0.5f,1},Shader.TileMode.CLAMP));c.drawRect(0,h*.22f,w,h,scrimPaint);scrimPaint.setShader(null);
   }
  }
 }

@@ -20,6 +20,7 @@ final class WallpaperPicker extends FrameLayout {
  private final Context context;
  private final Runnable back;
  private final Added added;
+ private final Runnable removed;
  private final Handler ui=new Handler(Looper.getMainLooper());
  private final ExecutorService api=Executors.newSingleThreadExecutor(),images=Executors.newFixedThreadPool(2);
  private final LruCache<String,Bitmap> cache=new LruCache<String,Bitmap>(8*1024*1024){protected int sizeOf(String key,Bitmap bitmap){return bitmap.getByteCount();}};
@@ -34,10 +35,11 @@ final class WallpaperPicker extends FrameLayout {
  private volatile boolean closed;
  private boolean loading,hasMore,adding;
  private WallpaperFramer framer;
+ private final WallpaperActions wallpaperActions=new WallpaperActions();
  private int generation,page;
  private String query="";
- WallpaperPicker(Context context,Runnable back,Added added){
-  super(context);this.context=context;this.back=back;this.added=added;
+ WallpaperPicker(Context context,Runnable back,Added added,Runnable removed){
+  super(context);this.context=context;this.back=back;this.added=added;this.removed=removed;
   setBackgroundColor(0xf20b0e14);setClickable(true);setFocusable(false);
   for(WallpaperLibrary.Saved saved:WallpaperLibrary.list(context))savedIds.add(saved.id);
   LinearLayout column=new LinearLayout(context);column.setOrientation(1);column.setPadding(dp(48),dp(30),dp(48),0);addView(column,new LayoutParams(-1,-1));
@@ -54,12 +56,13 @@ final class WallpaperPicker extends FrameLayout {
   progress=new ProgressBar(context);progress.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(0xfff5f5f7));info.addView(progress,new LinearLayout.LayoutParams(dp(20),dp(20)));
   retry=label("Try again",13,0xfff5f5f7);retry.setGravity(Gravity.CENTER);retry.setPadding(dp(12),dp(6),dp(12),dp(6));retry.setBackground(fill(0x33ffffff,9));retry.setFocusable(true);retry.setClickable(true);retry.setVisibility(GONE);retry.setOnClickListener(v->load());info.addView(retry,new LinearLayout.LayoutParams(-2,-2));
   grid=new GridView(context);grid.setNumColumns(3);grid.setHorizontalSpacing(dp(18));grid.setVerticalSpacing(dp(18));grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);grid.setPadding(dp(8),dp(8),dp(8),dp(32));grid.setClipToPadding(false);grid.setClipChildren(false);grid.setSelector(android.R.color.transparent);grid.setVerticalScrollBarEnabled(false);grid.setAdapter(adapter);column.addView(grid,new LinearLayout.LayoutParams(-1,0,1));
-  grid.setOnFocusChangeListener((v,f)->adapter.notifyDataSetChanged());
+  grid.setOnFocusChangeListener((v,f)->{if(!wallpaperActions.isShowing())adapter.notifyDataSetChanged();});
   grid.setOnItemClickListener((parent,view,position,id)->choose(results.get(position)));
+  grid.setOnItemLongClickListener((parent,view,position,id)->{deleteTile(view,position);return true;});
   grid.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> p,View v,int n,long id){adapter.notifyDataSetChanged();}public void onNothingSelected(AdapterView<?> p){}});
   grid.setOnScrollListener(new AbsListView.OnScrollListener(){public void onScrollStateChanged(AbsListView view,int state){}public void onScroll(AbsListView view,int first,int visible,int total){if(total>0&&first+visible>=total-3&&hasMore&&!loading&&!adding)load();}});
   search.setOnKeyListener((v,key,event)->{if(key==KeyEvent.KEYCODE_DPAD_DOWN&&event.getAction()==KeyEvent.ACTION_DOWN&&!results.isEmpty()){hideKeyboard();grid.requestFocus();grid.setSelection(0);return true;}return false;});
-  grid.setOnKeyListener((v,key,event)->{if(event.getAction()!=KeyEvent.ACTION_DOWN)return false;int n=Math.max(0,grid.getSelectedItemPosition());if(key==KeyEvent.KEYCODE_DPAD_UP&&n<3){search.requestFocus();return true;}if(key==KeyEvent.KEYCODE_DPAD_LEFT&&n%3==0)return true;if(key==KeyEvent.KEYCODE_DPAD_RIGHT&&(n%3==2||n==results.size()-1))return true;return false;});
+  grid.setOnKeyListener((v,key,event)->{if(event.getAction()!=KeyEvent.ACTION_DOWN)return false;int n=Math.max(0,grid.getSelectedItemPosition());if(key==KeyEvent.KEYCODE_MENU){if(n<results.size()){View tile=grid.getChildAt(n-grid.getFirstVisiblePosition());if(tile!=null)deleteTile(tile,n);}return true;}if(key==KeyEvent.KEYCODE_DPAD_UP&&n<3){search.requestFocus();return true;}if(key==KeyEvent.KEYCODE_DPAD_LEFT&&n%3==0)return true;if(key==KeyEvent.KEYCODE_DPAD_RIGHT&&(n%3==2||n==results.size()-1))return true;return false;});
   post(()->{search.requestFocus();begin();});
  }
  private int dp(float value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -82,13 +85,21 @@ final class WallpaperPicker extends FrameLayout {
     if(closed){original.recycle();return;}progress.setVisibility(GONE);status.setText(term.isEmpty()?"Popular wallpapers":"Results for “"+term+"”");
     framer=new WallpaperFramer(context,original,this::dismissFrame,framed->{
      WallpaperFramer editing=framer;
-     api.execute(()->{try{WallpaperLibrary.Saved saved=WallpaperLibrary.add(context,image,term,framed);ui.post(()->{if(!closed&&framer==editing)added.done(saved);});}
+     api.execute(()->{try{WallpaperLibrary.Saved saved=WallpaperLibrary.add(context,image,term,framed);ui.post(()->{if(!closed&&framer==editing){savedIds.add(saved.id);dismissFrame();adapter.notifyDataSetChanged();added.done(saved);}});}
       catch(Exception error){ui.post(()->{if(!closed&&framer==editing){editing.failed();Toast.makeText(context,"Couldn’t save this wallpaper. Try again.",Toast.LENGTH_LONG).show();}});}finally{framed.recycle();}});
     });addView(framer,new LayoutParams(-1,-1));
    });}catch(Exception error){ui.post(()->{if(closed)return;adding=false;progress.setVisibility(GONE);status.setText(error.getClass()==IOException.class?error.getMessage():"Couldn’t open this wallpaper. Try again.");});}
   });
  }
  private void dismissFrame(){if(framer==null)return;WallpaperFramer previous=framer;framer=null;removeView(previous);previous.release();adding=false;grid.requestFocus();}
+ private void deleteTile(View tile,int position){
+  if(position<0||position>=results.size())return;
+  String imageId=results.get(position).id;if(!savedIds.contains(imageId))return;
+  wallpaperActions.show((MainActivity)context,tile,grid,()->{
+   if(!WallpaperLibrary.remove(context,imageId)){Toast.makeText(context,"Couldn’t delete this wallpaper",Toast.LENGTH_SHORT).show();grid.post(()->grid.requestFocus());return;}
+   savedIds.remove(imageId);adapter.notifyDataSetChanged();removed.run();grid.post(()->grid.requestFocus());Toast.makeText(context,"Wallpaper deleted",Toast.LENGTH_SHORT).show();
+  });
+ }
  boolean back(){if(framer==null)return false;dismissFrame();return true;}
  private void thumbnail(Wallhaven.Image image,ImageView view){
   view.setTag(image.id);Bitmap bitmap=cache.get(image.id);if(bitmap!=null){view.setImageBitmap(bitmap);return;}view.setImageDrawable(null);
@@ -128,6 +139,6 @@ final class WallpaperPicker extends FrameLayout {
   IconButton(){super(context);setFocusable(true);setClickable(true);setBackground(fill(0x33ffffff,22));setOnFocusChangeListener((v,f)->{setBackground(fill(f?0xfff5f5f7:0x33ffffff,22));invalidate();});}
   protected void onDraw(Canvas canvas){float cx=getWidth()/2f,cy=getHeight()/2f;paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);paint.setColor(isFocused()?0xff1c1c1e:0xfff5f5f7);Path path=new Path();path.moveTo(cx+dp(7),cy);path.lineTo(cx-dp(7),cy);path.lineTo(cx,cy-dp(7));path.moveTo(cx-dp(7),cy);path.lineTo(cx,cy+dp(7));canvas.drawPath(path,paint);}
  }
- void close(){if(framer!=null){WallpaperFramer previous=framer;framer=null;removeView(previous);previous.release();}closed=true;generation++;api.shutdownNow();images.shutdownNow();ui.removeCallbacksAndMessages(null);pending.clear();hideKeyboard();}
+ void close(){wallpaperActions.dismiss();if(framer!=null){WallpaperFramer previous=framer;framer=null;removeView(previous);previous.release();}closed=true;generation++;api.shutdownNow();images.shutdownNow();ui.removeCallbacksAndMessages(null);pending.clear();hideKeyboard();}
  @Override protected void onDetachedFromWindow(){close();super.onDetachedFromWindow();}
 }

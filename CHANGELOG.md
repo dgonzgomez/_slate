@@ -1,5 +1,11 @@
 # What's new
 
+### 0.1.1
+
+- Wallpapers: save a framed Wallhaven image to your library and keep browsing. Delete saved wallpapers from Settings or the picker with the same trash control used by the app rail.
+- Wallpaper framing: Save replaces Set, and Menu plus the remote’s direction keys reach the zoom and save controls.
+- Home: the app rail no longer reserves empty space when the TV has no HDMI inputs.
+
 ### 0.1.0
 
 - Home screen: an app rail with a clock, wallpapers, and settings. Long-press an app or press Menu to move it or remove it from the rail.

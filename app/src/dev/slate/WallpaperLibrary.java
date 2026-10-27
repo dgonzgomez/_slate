@@ -19,6 +19,16 @@ final class WallpaperLibrary {
   return out;
  }
  static SharedPreferences prefs(Context context){return context.getSharedPreferences("slate_home",0);}
+ static boolean remove(Context context,String id){
+  if(!WallpaperPolicy.validId(id))return false;
+  try{
+   JSONArray entries=new JSONArray();for(Saved saved:list(context))if(!saved.id.equals(id)){JSONObject entry=new JSONObject();entry.put("id",saved.id);entry.put("name",saved.name);entries.put(entry);}
+   SharedPreferences preferences=prefs(context);SharedPreferences.Editor edit=preferences.edit().putString("wallpaper_library",entries.toString());
+   if(id.equals(preferences.getString(SELECTED,"")))edit.remove(SELECTED).putString("wallpaper_theme","night");
+   if(!edit.commit())return false;
+   file(context,id).delete();return true;
+  }catch(Exception error){return false;}
+ }
  static Saved add(Context context,Wallhaven.Image image,String query,Bitmap framed)throws Exception{
   File target=file(context,image.id),pending=new File(target.getParentFile(),image.id+".part");
   try{

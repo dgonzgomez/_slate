@@ -23,6 +23,7 @@ class SettingsPanel extends FrameLayout {
  private final UpdateManager updater;
  private int pageGeneration;
  private WallpaperPicker picker;
+ private final WallpaperActions wallpaperActions=new WallpaperActions();
 
 
  SettingsPanel(MainActivity home){
@@ -86,8 +87,12 @@ class SettingsPanel extends FrameLayout {
   onMain=false;page("Wallpaper",1);
   View add=row("Add Wallpaper","",false,false,this::addWallpaper);((Mark)((ViewGroup)add).getChildAt(2)).kind=3;
   int legacy=legacyWallpaper();String theme=home.prefs.getString("wallpaper_theme","night");String custom=home.prefs.getString(WallpaperLibrary.SELECTED,"");View selected=null;
-  for(WallpaperLibrary.Saved saved:WallpaperLibrary.list(home)){
-   boolean active=saved.id.equals(custom);View option=row(saved.name,"",false,active,()->selectWallpaper(saved.id));if(active)selected=option;
+  List<WallpaperLibrary.Saved> saved=WallpaperLibrary.list(home);
+  for(WallpaperLibrary.Saved wallpaper:saved){
+   boolean active=wallpaper.id.equals(custom);View option=row(wallpaper.name,"",false,active,()->selectWallpaper(wallpaper.id));
+   option.setOnLongClickListener(v->{showDelete(option,wallpaper.id);return true;});
+   option.setOnKeyListener((v,key,event)->{if(key==KeyEvent.KEYCODE_MENU){if(event.getAction()==KeyEvent.ACTION_UP)showDelete(option,wallpaper.id);return true;}return false;});
+   if(active)selected=option;
   }
   if(legacy>=0){boolean active=custom.isEmpty();View r=row(LEGACY[legacy],"",false,active,()->{home.prefs.edit().remove(WallpaperLibrary.SELECTED).remove("wallpaper_theme").apply();refreshWallpaper();});if(active)selected=r;}
   for(int i=0;i<WALLPAPERS.length;i++){final String preset=i==0?"day":"night";boolean active=custom.isEmpty()&&legacy<0&&preset.equals(theme);View r=row(WALLPAPERS[i],"",false,active,()->{home.prefs.edit().remove(WallpaperLibrary.SELECTED).putString("wallpaper_theme",preset).apply();refreshWallpaper();});if(active)selected=r;}
@@ -95,10 +100,17 @@ class SettingsPanel extends FrameLayout {
  }
  private int legacyWallpaper(){int old=home.prefs.getInt("wallpaper",0);return !home.prefs.contains("wallpaper_theme")&&old>=3&&old<LEGACY.length?old:-1;}
  private void refreshWallpaper(){home.refreshWallpaper();post(()->{refreshBackdrop();wallpapers();});}
- private void selectWallpaper(String id){home.prefs.edit().putString(WallpaperLibrary.SELECTED,id).apply();refreshWallpaper();}
+ private void selectWallpaper(String id){home.prefs.edit().remove("wallpaper_theme").putString(WallpaperLibrary.SELECTED,id).apply();refreshWallpaper();}
+ private void showDelete(View option,String id){int index=list.indexOfChild(option);wallpaperActions.show(home,option,list,()->deleteWallpaper(id,index));}
+ private void deleteWallpaper(String id,int index){
+  if(!WallpaperLibrary.remove(home,id)){Toast.makeText(home,"Couldn’t delete this wallpaper",Toast.LENGTH_SHORT).show();if(index>=0&&index<list.getChildCount())list.getChildAt(index).requestFocus();return;}
+  home.refreshWallpaper();refreshBackdrop();wallpapers();
+  list.post(()->{if(list.getChildCount()>0)list.getChildAt(Math.max(0,Math.min(index,list.getChildCount()-1))).requestFocus();});
+  Toast.makeText(home,"Wallpaper deleted",Toast.LENGTH_SHORT).show();
+ }
  private void addWallpaper(){
   if(picker!=null)return;
-  picker=new WallpaperPicker(home,this::closePicker,saved->{closePicker();selectWallpaper(saved.id);Toast.makeText(home,"Wallpaper added",Toast.LENGTH_SHORT).show();});
+  picker=new WallpaperPicker(home,this::closePicker,saved->{Toast.makeText(home,"Wallpaper saved",Toast.LENGTH_SHORT).show();},()->{home.refreshWallpaper();refreshBackdrop();});
   addView(picker,new LayoutParams(-1,-1));
  }
  private void closePicker(){if(picker==null)return;WallpaperPicker closing=picker;picker=null;closing.close();removeView(closing);wallpapers();if(list.getChildCount()>0)list.getChildAt(0).requestFocus();}
@@ -153,7 +165,7 @@ class SettingsPanel extends FrameLayout {
   action.requestFocus();
  }
 
- @Override protected void onDetachedFromWindow(){updater.close();super.onDetachedFromWindow();}
+ @Override protected void onDetachedFromWindow(){wallpaperActions.dismiss();updater.close();super.onDetachedFromWindow();}
 
  @Override public View focusSearch(View focused,int direction){
   View next=super.focusSearch(focused,direction);
