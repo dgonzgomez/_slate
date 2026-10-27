@@ -152,11 +152,13 @@ class SettingsPanel extends FrameLayout {
   TextView status=new TextView(home);status.setTextSize(15);status.setTextColor(0xccf2f2f7);status.setLineSpacing(dp(5),1f);status.setPadding(dp(22),dp(12),dp(22),dp(18));list.addView(status,new LinearLayout.LayoutParams(-1,-2));
   UpdateManager.Listener changed=(message,busy)->{
    if(generation!=pageGeneration)return;
-   status.setText(message);action.setEnabled(!busy);action.setAlpha(busy?.6f:1f);
+   // Keep the remote focused on the next step while work finishes.
+   status.setText(message);action.setAlpha(busy?.6f:1f);
    ((TextView)((ViewGroup)action).getChildAt(0)).setText(updater.downloaded?"Install update":updater.available!=null?"Download update":"Check for updates");
   };
   updater.observe(changed);
   action.setOnClickListener(v->{
+   if(updater.isBusy())return;
    if(updater.downloaded){try{status.setText(updater.install());}catch(Exception e){status.setText(e.getMessage()==null?"The installer couldn’t open. Try again.":e.getMessage());}}
    else if(updater.available!=null)updater.download(changed);
    else updater.check(changed);
@@ -164,6 +166,8 @@ class SettingsPanel extends FrameLayout {
   row("Check again","",false,false,()->updater.check(changed));
   action.requestFocus();
  }
+
+ void updatePermissionReturned(){updater.permissionReturned();}
 
  @Override protected void onDetachedFromWindow(){wallpaperActions.dismiss();updater.close();super.onDetachedFromWindow();}
 

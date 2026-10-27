@@ -15,6 +15,9 @@ import org.json.*;
 
 /** GitHub release check, verified download and system-confirmed install. */
 final class UpdateManager {
+ static final int INSTALL_PERMISSION_REQUEST=701;
+ private boolean awaitingInstallPermission;
+ boolean isBusy(){return busy;}
  interface Listener{void changed(String message,boolean busy);}
  static final class Release{
   final String version,url,digest;final long size;
@@ -97,8 +100,12 @@ final class UpdateManager {
   if(!downloaded||available==null)throw new IOException("Download the update first.");
   File apk=UpdateProvider.apk(activity);validate(apk,available.version);
   if(Build.VERSION.SDK_INT>=26&&!activity.getPackageManager().canRequestPackageInstalls()){
-   try{activity.startActivity(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+activity.getPackageName())));}
-   catch(ActivityNotFoundException e){activity.startActivity(new Intent(Settings.ACTION_SECURITY_SETTINGS));}
+   HomeService.bypassUntil=SystemClock.elapsedRealtime()+120000;
+   awaitingInstallPermission=true;
+   try{
+    try{activity.startActivityForResult(new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+activity.getPackageName())),INSTALL_PERMISSION_REQUEST);}
+    catch(ActivityNotFoundException e){activity.startActivityForResult(new Intent(Settings.ACTION_SECURITY_SETTINGS),INSTALL_PERMISSION_REQUEST);}
+   }catch(RuntimeException e){awaitingInstallPermission=false;throw e;}
    return "Allow Slate to install apps in Fire TV settings, then select Install update again.";
   }
   Uri uri=Uri.parse("content://"+activity.getPackageName()+".update/slate.apk");
@@ -120,6 +127,15 @@ final class UpdateManager {
   Set<Signature> expected=signatures(installed),actual=signatures(incoming);
   if(expected.isEmpty()||!expected.equals(actual))throw new IOException("This update uses a different signing key. Your data is safe; ask the maintainer for an update signed with the original Slate key.");
   if(Build.VERSION.SDK_INT>=24&&incoming.applicationInfo!=null&&incoming.applicationInfo.minSdkVersion>Build.VERSION.SDK_INT)throw new IOException("This update needs a newer Fire OS version.");
+ }
+ void permissionReturned(){
+  if(closed||!awaitingInstallPermission)return;
+  awaitingInstallPermission=false;
+  if(Build.VERSION.SDK_INT>=26&&!activity.getPackageManager().canRequestPackageInstalls()){
+   say(observer,"Installation permission is still off. Select Install update to open settings again.",false);return;
+  }
+  try{say(observer,install(),false);}
+  catch(Exception e){say(observer,message(e,"The installer couldn’t open. Select Install update to try again."),false);}
  }
  private static Set<Signature> signatures(PackageInfo info){return info.signatures==null?Collections.emptySet():new HashSet<>(Arrays.asList(info.signatures));}
  private HttpURLConnection open(String address)throws Exception{

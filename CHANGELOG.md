@@ -1,5 +1,10 @@
 # What's new
 
+### 0.1.2
+
+- Updates: keep remote focus on the update button as checking and downloading finish.
+- Installation: resume the installer after returning from unknown-app permission settings, and give settings time to stay open.
+
 ### 0.1.1
 
 - Wallpapers: save a framed Wallhaven image to your library and keep browsing. Delete saved wallpapers from Settings or the picker with the same trash control used by the app rail.

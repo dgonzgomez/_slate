@@ -394,6 +394,10 @@ public class MainActivity extends Activity {
   if(returnTile==null&&returnPackage!=null){int idx=favorites.indexOf(returnPackage);if(idx>=0){View card=rail.getChildAt(idx);int[] xy=new int[2],origin=new int[2];card.getLocationOnScreen(xy);((View)wallpaper.getParent()).getLocationOnScreen(origin);returnTile=Bitmap.createBitmap(Math.max(1,card.getWidth()),Math.max(1,card.getHeight()),Bitmap.Config.ARGB_8888);card.draw(new Canvas(returnTile));returnTarget=new RectF(xy[0]-origin[0],xy[1]-origin[1],xy[0]-origin[0]+card.getWidth(),xy[1]-origin[1]+card.getHeight());}}
   playReturn();
  }
+ @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
+  super.onActivityResult(requestCode,resultCode,data);
+  if(requestCode==UpdateManager.INSTALL_PERMISSION_REQUEST&&panel!=null)panel.updatePermissionReturned();
+ }
  @Override protected void onResume(){
   super.onResume();activityResumed=true;interactive=hasWindowFocus();if(returnAnimationPending)overridePendingTransition(0,0);clearLaunchSurface();resumedAt=android.os.SystemClock.elapsedRealtime();LauncherWatchService.sawOtherApp=false;
   // Present the return surface before any TV-service IPC or housekeeping.
